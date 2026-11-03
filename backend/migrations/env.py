@@ -12,6 +12,7 @@ from src.models import consumers
 from src.models import materials
 from src.models import suppliers
 from src.models import user_details
+from src.models.warehouse import Warehouse
 
 config = context.config
 

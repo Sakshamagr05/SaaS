@@ -1,43 +1,26 @@
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, Query
+from sqlmodel import Session
 
 from src.database import get_session
 from src.dependencies import get_account_or_404
-from src.models.account import Account
 from src.models.suppliers import Supplier
 from src.schemas.suppliers import (
     SupplierCreate,
     SupplierRead,
     SupplierUpdate,
 )
+from src.services.crud import (
+    create_resource,
+    list_resources,
+    get_resource_or_404,
+    update_resource,
+    delete_resource,
+)
 
 router = APIRouter(
     prefix="/accounts/{account_id}/suppliers",
     tags=["Suppliers"],
 )
-
-
-def get_supplier_or_404(
-    account_id: int,
-    supplier_id: int,
-    session: Session,
-):
-    supplier = session.exec(
-        select(Supplier).where(
-            Supplier.id == supplier_id,
-            Supplier.account_id == account_id,
-        )
-    ).first()
-
-    if supplier is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Supplier not found",
-        )
-
-    return supplier
 
 
 # CREATE
@@ -49,23 +32,15 @@ def create_supplier(
 ):
     get_account_or_404(account_id, session)
 
-    supplier = Supplier(
+    return create_resource(
+        model=Supplier,
         account_id=account_id,
-        **data.model_dump(),
+        data=data.model_dump(),
+        session=session,
+        conflict_detail=(
+            "Could not create supplier due to a database constraint"
+        ),
     )
-
-    try:
-        session.add(supplier)
-        session.commit()
-        session.refresh(supplier)
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Could not create supplier due to a database constraint",
-        )
-
-    return supplier
 
 
 # READ ALL
@@ -78,14 +53,13 @@ def get_suppliers(
 ):
     get_account_or_404(account_id, session)
 
-    statement = (
-        select(Supplier)
-        .where(Supplier.account_id == account_id)
-        .offset(offset)
-        .limit(limit)
+    return list_resources(
+        model=Supplier,
+        account_id=account_id,
+        session=session,
+        offset=offset,
+        limit=limit,
     )
-
-    return session.exec(statement).all()
 
 
 # READ ONE
@@ -95,8 +69,12 @@ def get_supplier(
     supplier_id: int,
     session: Session = Depends(get_session),
 ):
-    return get_supplier_or_404(
-        account_id, supplier_id, session
+    return get_resource_or_404(
+        model=Supplier,
+        account_id=account_id,
+        resource_id=supplier_id,
+        resource_name="Supplier",
+        session=session,
     )
 
 
@@ -108,30 +86,25 @@ def update_supplier(
     data: SupplierUpdate,
     session: Session = Depends(get_session),
 ):
-    supplier = get_supplier_or_404(
-        account_id, supplier_id, session
+    supplier = get_resource_or_404(
+        model=Supplier,
+        account_id=account_id,
+        resource_id=supplier_id,
+        resource_name="Supplier",
+        session=session,
     )
 
-    changes = data.model_dump(
-        exclude_unset=True,
-        exclude_none=True,
+    return update_resource(
+        resource=supplier,
+        changes=data.model_dump(
+            exclude_unset=True,
+            exclude_none=True,
+        ),
+        session=session,
+        conflict_detail=(
+            "Could not update supplier due to a database constraint"
+        ),
     )
-
-    for key, value in changes.items():
-        setattr(supplier, key, value)
-
-    try:
-        session.add(supplier)
-        session.commit()
-        session.refresh(supplier)
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Could not update supplier due to a database constraint",
-        )
-
-    return supplier
 
 
 # DELETE
@@ -141,11 +114,20 @@ def delete_supplier(
     supplier_id: int,
     session: Session = Depends(get_session),
 ):
-    supplier = get_supplier_or_404(
-        account_id, supplier_id, session
+    supplier = get_resource_or_404(
+        model=Supplier,
+        account_id=account_id,
+        resource_id=supplier_id,
+        resource_name="Supplier",
+        session=session,
     )
 
-    session.delete(supplier)
-    session.commit()
+    delete_resource(
+        resource=supplier,
+        session=session,
+        conflict_detail=(
+            "Cannot delete supplier because related records exist"
+        ),
+    )
 
     return None

@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, Query
+from sqlmodel import Session
 
 from src.database import get_session
 from src.dependencies import get_account_or_404
@@ -10,32 +9,18 @@ from src.schemas.consumers import (
     ConsumerRead,
     ConsumerUpdate,
 )
+from src.services.crud import (
+    create_resource,
+    list_resources,
+    get_resource_or_404,
+    update_resource,
+    delete_resource,
+)
 
 router = APIRouter(
     prefix="/accounts/{account_id}/consumers",
     tags=["Consumers"],
 )
-
-
-def get_consumer_or_404(
-    account_id: int,
-    consumer_id: int,
-    session: Session,
-) -> Consumer:
-    consumer = session.exec(
-        select(Consumer).where(
-            Consumer.id == consumer_id,
-            Consumer.account_id == account_id,
-        )
-    ).first()
-
-    if consumer is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Consumer not found",
-        )
-
-    return consumer
 
 
 # CREATE
@@ -47,23 +32,15 @@ def create_consumer(
 ):
     get_account_or_404(account_id, session)
 
-    consumer = Consumer(
+    return create_resource(
+        model=Consumer,
         account_id=account_id,
-        **data.model_dump(),
+        data=data.model_dump(),
+        session=session,
+        conflict_detail=(
+            "Could not create consumer due to a database constraint"
+        ),
     )
-
-    try:
-        session.add(consumer)
-        session.commit()
-        session.refresh(consumer)
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Could not create consumer due to a database constraint",
-        )
-
-    return consumer
 
 
 # READ ALL
@@ -76,14 +53,13 @@ def get_consumers(
 ):
     get_account_or_404(account_id, session)
 
-    statement = (
-        select(Consumer)
-        .where(Consumer.account_id == account_id)
-        .offset(offset)
-        .limit(limit)
+    return list_resources(
+        model=Consumer,
+        account_id=account_id,
+        session=session,
+        offset=offset,
+        limit=limit,
     )
-
-    return session.exec(statement).all()
 
 
 # READ ONE
@@ -93,8 +69,12 @@ def get_consumer(
     consumer_id: int,
     session: Session = Depends(get_session),
 ):
-    return get_consumer_or_404(
-        account_id, consumer_id, session
+    return get_resource_or_404(
+        model=Consumer,
+        account_id=account_id,
+        resource_id=consumer_id,
+        resource_name="Consumer",
+        session=session,
     )
 
 
@@ -106,30 +86,25 @@ def update_consumer(
     data: ConsumerUpdate,
     session: Session = Depends(get_session),
 ):
-    consumer = get_consumer_or_404(
-        account_id, consumer_id, session
+    consumer = get_resource_or_404(
+        model=Consumer,
+        account_id=account_id,
+        resource_id=consumer_id,
+        resource_name="Consumer",
+        session=session,
     )
 
-    changes = data.model_dump(
-        exclude_unset=True,
-        exclude_none=True,
+    return update_resource(
+        resource=consumer,
+        changes=data.model_dump(
+            exclude_unset=True,
+            exclude_none=True,
+        ),
+        session=session,
+        conflict_detail=(
+            "Could not update consumer due to a database constraint"
+        ),
     )
-
-    for key, value in changes.items():
-        setattr(consumer, key, value)
-
-    try:
-        session.add(consumer)
-        session.commit()
-        session.refresh(consumer)
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Could not update consumer due to a database constraint",
-        )
-
-    return consumer
 
 
 # DELETE
@@ -139,12 +114,20 @@ def delete_consumer(
     consumer_id: int,
     session: Session = Depends(get_session),
 ):
-    consumer = get_consumer_or_404(
-        account_id, consumer_id, session
+    consumer = get_resource_or_404(
+        model=Consumer,
+        account_id=account_id,
+        resource_id=consumer_id,
+        resource_name="Consumer",
+        session=session,
     )
 
-    session.delete(consumer)
-    session.commit()
+    delete_resource(
+        resource=consumer,
+        session=session,
+        conflict_detail=(
+            "Cannot delete consumer because related records exist"
+        ),
+    )
 
     return None
-

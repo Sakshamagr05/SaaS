@@ -1,43 +1,27 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from src.database import get_session
 from src.dependencies import get_account_or_404
-from src.models.account import Account
 from src.models.materials import Material
 from src.schemas.materials import (
     MaterialCreate,
     MaterialRead,
     MaterialUpdate,
 )
+from src.services.crud import (
+    create_resource,
+    list_resources,
+    get_resource_or_404,
+    update_resource,
+    delete_resource,
+)
 
 router = APIRouter(
     prefix="/accounts/{account_id}/materials",
     tags=["Materials"],
 )
-
-
-def get_material_or_404(
-    account_id: int,
-    material_id: int,
-    session: Session,
-):
-    material = session.exec(
-        select(Material).where(
-            Material.id == material_id,
-            Material.account_id == account_id,
-        )
-    ).first()
-
-    if material is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Material not found",
-        )
-
-    return material
 
 
 # CREATE
@@ -49,24 +33,16 @@ def create_material(
 ):
     get_account_or_404(account_id, session)
 
-    material = Material(
+    return create_resource(
+        model=Material,
         account_id=account_id,
-        **data.model_dump(),
+        data=data.model_dump(),
+        session=session,
+        conflict_detail=(
+            "Material SKU already exists for this account "
+            "or a database constraint was violated"
+        ),
     )
-
-    try:
-        session.add(material)
-        session.commit()
-        session.refresh(material)
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Material SKU already exists for this account "
-                   "or a database constraint was violated",
-        )
-
-    return material
 
 
 # READ ALL
@@ -79,14 +55,13 @@ def get_materials(
 ):
     get_account_or_404(account_id, session)
 
-    statement = (
-        select(Material)
-        .where(Material.account_id == account_id)
-        .offset(offset)
-        .limit(limit)
+    return list_resources(
+        model=Material,
+        account_id=account_id,
+        session=session,
+        offset=offset,
+        limit=limit,
     )
-
-    return session.exec(statement).all()
 
 
 # READ ONE
@@ -96,8 +71,12 @@ def get_material(
     material_id: int,
     session: Session = Depends(get_session),
 ):
-    return get_material_or_404(
-        account_id, material_id, session
+    return get_resource_or_404(
+        model=Material,
+        account_id=account_id,
+        resource_id=material_id,
+        resource_name="Material",
+        session=session,
     )
 
 
@@ -109,31 +88,26 @@ def update_material(
     data: MaterialUpdate,
     session: Session = Depends(get_session),
 ):
-    material = get_material_or_404(
-        account_id, material_id, session
+    material = get_resource_or_404(
+        model=Material,
+        account_id=account_id,
+        resource_id=material_id,
+        resource_name="Material",
+        session=session,
     )
 
-    changes = data.model_dump(
-        exclude_unset=True,
-        exclude_none=True,
+    return update_resource(
+        resource=material,
+        changes=data.model_dump(
+            exclude_unset=True,
+            exclude_none=True,
+        ),
+        session=session,
+        conflict_detail=(
+            "SKU already exists for this account "
+            "or a database constraint was violated"
+        ),
     )
-
-    for key, value in changes.items():
-        setattr(material, key, value)
-
-    try:
-        session.add(material)
-        session.commit()
-        session.refresh(material)
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="SKU already exists for this account "
-                   "or a database constraint was violated",
-        )
-
-    return material
 
 
 # DELETE
@@ -143,11 +117,20 @@ def delete_material(
     material_id: int,
     session: Session = Depends(get_session),
 ):
-    material = get_material_or_404(
-        account_id, material_id, session
+    material = get_resource_or_404(
+        model=Material,
+        account_id=account_id,
+        resource_id=material_id,
+        resource_name="Material",
+        session=session,
     )
 
-    session.delete(material)
-    session.commit()
+    delete_resource(
+        resource=material,
+        session=session,
+        conflict_detail=(
+            "Cannot delete material because related records exist"
+        ),
+    )
 
     return None
