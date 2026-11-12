@@ -98,7 +98,6 @@ def update_supplier(
         resource=supplier,
         changes=data.model_dump(
             exclude_unset=True,
-            exclude_none=True,
         ),
         session=session,
         conflict_detail=(

@@ -2,6 +2,13 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
+import Suppliers from "./pages/Suppliers";
+import Materials from "./pages/Materials";
+import PurchaseOrders from "./pages/PurchaseOrders";
+import Warehouses from "./pages/Warehouses";
+import Shipments from "./pages/Shipments";
+import Inventory from "./pages/Inventory";
+import InventoryTransactions from "./pages/InventoryTransactions";
 
 function PlaceholderPage({ title }) {
   return (
@@ -22,13 +29,13 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
 
-          <Route path="/suppliers" element={<PlaceholderPage title="Suppliers" />} />
-          <Route path="/materials" element={<PlaceholderPage title="Materials" />} />
-          <Route path="/purchase-orders" element={<PlaceholderPage title="Purchase Orders" />} />
-          <Route path="/warehouses" element={<PlaceholderPage title="Warehouses" />} />
-          <Route path="/shipments" element={<PlaceholderPage title="Shipments" />} />
-          <Route path="/inventory" element={<PlaceholderPage title="Inventory" />} />
-          <Route path="/inventory/transactions" element={<PlaceholderPage title="Inventory Transactions" />} />
+          <Route path="/suppliers" element={<Suppliers />} />
+          <Route path="/materials" element={<Materials />} />
+          <Route path="/purchase-orders" element={<PurchaseOrders />} />          
+          <Route path="/warehouses" element={<Warehouses />} />
+          <Route path="/shipments" element={<Shipments />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/inventory-transactions" element={<InventoryTransactions />}/>
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

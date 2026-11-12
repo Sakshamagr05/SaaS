@@ -10,6 +10,7 @@ import {
   ArrowLeftRight,
   Factory,
   ChevronLeft,
+  History,
 } from "lucide-react";
 
 const navigation = [
@@ -32,12 +33,8 @@ const navigation = [
     items: [
       { name: "Warehouses", path: "/warehouses", icon: Warehouse },
       { name: "Shipments", path: "/shipments", icon: Truck },
-      { name: "Inventory", path: "/inventory", icon: Boxes },
-      {
-        name: "Transactions",
-        path: "/inventory/transactions",
-        icon: ArrowLeftRight,
-      },
+      { name: "Inventory", path: "/inventory", icon: Package },
+      { name: "Inventory Transactions", path: "/inventory-transactions", icon: History },
     ],
   },
 ];
